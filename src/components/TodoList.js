@@ -1,142 +1,168 @@
 import React, { useState, useEffect } from "react";
+import { v4 as uuidv4 } from "uuid";
 import "./TodoList.css";
 
-const TodoInput = ({ onAdd }) => {
-  const [newTodo, setNewTodo] = useState("");
-
-  const handleAddTodo = () => {
-    if (newTodo.trim()) {
-      onAdd(newTodo);
-      setNewTodo("");
-    }
-  };
-
-  return (
-    <div className="input-container">
-      <input
-        type="text"
-        value={newTodo}
-        onChange={(e) => setNewTodo(e.target.value)}
-      />
-      <button onClick={handleAddTodo}>Add Todo</button>
-    </div>
-  );
-};
-
-const TodoList = () => {
-  const [todos, setTodos] = useState([]);
-  const [editedTodoId, setEditedTodoId] = useState(null);
-  const [editedTodoText, setEditedTodoText] = useState("");
-  const [editedTodoStatus, setEditedTodoStatus] = useState(false);
+const TaskList = () => {
+  const [tasks, setTasks] = useState([]);
+  const [newTask, setNewTask] = useState("");
+  const [updateTask, setUpdateTask] = useState({
+    id: null,
+    title: "",
+    status: false,
+  });
 
   useEffect(() => {
-    // Fetch todos from the API
-    fetch("https://dummyjson.com/todos/random")
-      .then((res) => res.json())
-      .then((data) => {
-        const fetchedTodos = Array.isArray(data) ? data : [data];
-        setTodos(fetchedTodos);
-      })
-      .catch((error) => console.error("Error fetching todos:", error));
+    fetchTasks();
   }, []);
 
-  const addTodo = (todoText) => {
-    const newTodo = {
-      id: Date.now(),
-      todo: todoText,
-      completed: false,
-    };
-
-    setTodos((prevTodos) => [...prevTodos, newTodo]);
-  };
-
-  const updateTodo = () => {
-    if (editedTodoId !== null && editedTodoText.trim()) {
-      setTodos((prevTodos) =>
-        prevTodos.map((todo) =>
-          todo.id === editedTodoId
-            ? {
-                ...todo,
-                todo: editedTodoText,
-                completed: editedTodoStatus,
-              }
-            : todo
-        )
+  const fetchTasks = async () => {
+    try {
+      const response = await fetch(
+        "https://jsonplaceholder.typicode.com/todos?_limit=2"
       );
-      setEditedTodoId(null);
-      setEditedTodoText("");
-      setEditedTodoStatus(false);
+      const data = await response.json();
+      setTasks(data.map((task) => ({ ...task, id: uuidv4(), status: false })));
+    } catch (error) {
+      console.error("Error fetching tasks:", error);
     }
   };
 
-  const startEditing = (id, text, status) => {
-    setEditedTodoId(id);
-    setEditedTodoText(text);
-    setEditedTodoStatus(status);
+  const handleAddTask = async () => {
+    try {
+      const response = await fetch(
+        "https://jsonplaceholder.typicode.com/todos",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            title: newTask,
+            completed: false,
+          }),
+        }
+      );
+      const data = await response.json();
+      setTasks([...tasks, { ...data, id: uuidv4(), status: false }]);
+      setNewTask("");
+    } catch (error) {
+      console.error("Error adding task:", error);
+    }
   };
 
-  const cancelEditing = () => {
-    setEditedTodoId(null);
-    setEditedTodoText("");
-    setEditedTodoStatus(false);
+  const handleDeleteTask = async (id) => {
+    try {
+      await fetch(`https://jsonplaceholder.typicode.com/todos/${id}`, {
+        method: "DELETE",
+      });
+      const updatedTasks = tasks.filter((task) => task.id !== id);
+      setTasks(updatedTasks);
+    } catch (error) {
+      console.error("Error deleting task:", error);
+    }
   };
 
-  const deleteTodo = (id) => {
-    setTodos((prevTodos) => prevTodos.filter((todo) => todo.id !== id));
+  const handleUpdateTask = async () => {
+    try {
+      await fetch(
+        `https://jsonplaceholder.typicode.com/todos/${updateTask.id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(updateTask),
+        }
+      );
+      const updatedTasks = tasks.map((task) =>
+        task.id === updateTask.id
+          ? { ...task, title: updateTask.title, status: updateTask.status }
+          : task
+      );
+      setTasks(updatedTasks);
+      setUpdateTask({ id: null, title: "", status: false });
+    } catch (error) {
+      console.error("Error updating task:", error);
+    }
   };
 
-  const deleteAllTodos = () => {
-    setTodos([]);
+  const handleSetUpdateTask = (task) => {
+    setUpdateTask({ id: task.id, title: task.title, status: task.status });
   };
 
   return (
-    <div className="todo-container">
-      <TodoInput onAdd={addTodo} />
-      <ul>
-        {todos.map((todo) => (
-          <li key={todo.id}>
-            <div className="uniqueList">
-              {editedTodoId === todo.id ? (
-                <div className="innerList">
-                  <input
-                    type="text"
-                    value={editedTodoText}
-                    onChange={(e) => setEditedTodoText(e.target.value)}
-                  />
-                  <label>
-                    Completed
-                    <input
-                      type="checkbox"
-                      checked={editedTodoStatus}
-                      onChange={(e) => setEditedTodoStatus(e.target.checked)}
-                    />
-                  </label>
-                  <button onClick={updateTodo}>Save</button>
-                  <button onClick={cancelEditing}>Cancel</button>
-                </div>
-              ) : (
-                <div className="innerList">
-                  <span>{todo.todo}</span>
-                  <span style={{ color: todo.completed ? "green" : "red" }}>
-                    {todo.completed ? "✔ Completed" : "✘ Not Completed"}
-                  </span>
-                  <button
-                    onClick={() =>
-                      startEditing(todo.id, todo.todo, todo.completed)
-                    }
+    <div className="task-container">
+      <div className="input-container">
+        <input
+          type="text"
+          value={newTask}
+          onChange={(e) => setNewTask(e.target.value)}
+          className="task-input"
+          placeholder="Add Your Task..."
+        />
+        <button onClick={handleAddTask} className="add-button">
+          Add Task
+        </button>
+      </div>
+      <ul className="task-list">
+        {tasks.map((task) => (
+          <li key={task.id} className="task-item">
+            {updateTask.id === task.id ? (
+              <>
+                <input
+                  type="text"
+                  value={updateTask.title}
+                  onChange={(e) =>
+                    setUpdateTask({ ...updateTask, title: e.target.value })
+                  }
+                  className="update-input"
+                />
+                <input
+                  type="checkbox"
+                  checked={updateTask.status}
+                  onChange={() =>
+                    setUpdateTask({ ...updateTask, status: !updateTask.status })
+                  }
+                  className="status-checkbox"
+                />
+                <button onClick={handleUpdateTask} className="update-button">
+                  Update
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="stylesForList">
+                  <span className="taskTitle">{task.title}</span>
+                  <span
+                    className={`status-indicator ${
+                      task.status ? "completed" : "incomplete"
+                    }`}
+                    style={{ color: task.status ? "green" : "red" }}
                   >
-                    Update
-                  </button>
-                  <button onClick={() => deleteTodo(todo.id)}>Delete</button>
+                    {task.status ? "✔ Completed" : "✘ Not Completed"}
+                  </span>
+                  <div className="task-actions">
+                    <button
+                      onClick={() => handleSetUpdateTask(task)}
+                      className="edit-button"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeleteTask(task.id)}
+                      className="delete-button"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
-              )}
-            </div>
+              </>
+            )}
           </li>
         ))}
       </ul>
-      <button onClick={deleteAllTodos}>Delete All</button>
     </div>
   );
 };
 
-export default TodoList;
+export default TaskList;
